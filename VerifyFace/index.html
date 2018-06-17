@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Comparing Two Faces by Using Cognitive API</title>
+	<style>
+		video, canvas {
+			/* Overlap video and canvas at same place */
+			position: absolute;
+		}
+	</style>
+</head>
+<body>
+	<script src="https://code.jquery.com/jquery-1.11.2.min.js"></script>
+	<script src="https://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+
+	<!-- Import webcam javascript -->
+	<script type="text/javascript" src="webcam.min.js"></script>
+	<!-- Import webcamSnapshot javascript -->
+	<script type="text/javascript" src="webcamSnapshot.js"></script>
+	<!-- Import track javascript -->
+	<script src="build/tracking-min.js"></script>
+	<!-- Import Object tracker javascript -->
+	<script src="build/data/face-min.js"></script>
+	<!-- Import cognitive Face API service library for verifing face in JavaScript -->
+	<script type="text/javascript" src="cogFace.js"></script>
+
+	<script language="JavaScript">
+		var availiable_snapshot = 0; //0: Face is not detected, 1: Detected Face is small, 2: availiable
+		var wait_snapshot = false; //If face is detected, wait 1 seconds through this variable
+		var process_snapshot = false; //In processing snapshot state, can't acess take_snapshot
+		var iswebcamOn = false; //Stop verify face untill webcamOn is true
+		
+		//Track & Recognize face
+		window.onload = function() {
+			$("#snapshotButton").hide();
+
+			var video = document.getElementById('video');
+			var canvas = document.getElementById('canvas');
+			var context = canvas.getContext('2d');
+
+			var tracker = new tracking.ObjectTracker('face');
+			tracker.setInitialScale(4);
+			tracker.setStepSize(2);
+			tracker.setEdgesDensity(0.1);
+
+			tracking.track('#video', tracker, { camera: true });
+
+			tracker.on('track', function(event) {
+				context.clearRect(0, 0, canvas.width, canvas.height);
+
+				if (event.data.length === 0)
+				{
+					// No face were detected in this frame.
+					if (wait_snapshot == false)
+					{
+						availiable_snapshot = 0;
+						$("#snapshotButton").hide();
+					}
+				} 
+				else {
+					event.data.forEach(function(rect) {
+						context.strokeStyle = '#a64ceb';
+						context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+						context.font = '11px Helvetica';
+						context.fillStyle = "#fff";
+						context.fillText('x: ' + rect.x + 'px', rect.x + rect.width + 5, rect.y + 11);
+						context.fillText('y: ' + rect.y + 'px', rect.x + rect.width + 5, rect.y + 22);
+						
+						if (process_snapshot == false)
+						{
+							if (rect.width >= 150)
+							{
+								process_snapshot = true;
+								wait_snapshot = true;
+								availiable_snapshot = 2;
+								$("#snapshotButton").show();
+								sleep(1000).then(() => {
+									// Do something after the sleep!
+									wait_snapshot = false;
+									snapshot();
+								})
+							}
+							else
+							{	
+								if (wait_snapshot == false)
+								{
+									availiable_snapshot = 1;
+									$("#snapshotButton").hide();
+								}
+							}
+						}
+					});
+				}
+			});
+		};
+
+		//Take Snapshot
+		function snapshot() {
+			$("#snapshotButton").hide();
+
+			if (availiable_snapshot == 2)
+			{
+				video.pause();
+
+				document.getElementById('resultInfo').innerHTML = '서버에 데이터를 저장중입니다.' + '<br>';
+				process_snapshot = takeSnapshot();
+			}
+			else if (availiable_snapshot == 1)
+			{
+				alert("Detected face is small");
+			}
+			else
+			{
+				//alert("No face is detected");
+			}
+		}
+
+		function webcamOn()
+		{
+			iswebcamOn = true;
+		}
+		
+		function webcamOff()
+		{
+			iswebcamOn = false;
+		}
+
+		function sleep (time) {
+  			return new Promise((resolve) => setTimeout(resolve, time));
+		}
+	</script>
+
+	<!-- Hidden form and button to upload image on server -->
+	<div id="snapshotButton">
+		<form id="myform" method="post" action="upload.php">
+			<input type=button value="On Webcam" onClick="webcamOn()">
+			<input type=button value="Off Webcam" onClick="webcamOff()">
+			<input id="mydata" type="hidden" name="mydata" value="">
+			<input id="imgName" type="hidden" name="imgName" value="">
+		</form>
+	</div>
+
+	<div class="frame">
+		<!-- Show webcam video -->
+		<video id="video" width="640" height="480" preload autoplay loop muted></video>
+		<!-- Make canvas for traking face -->
+		<canvas id="canvas" width="640" height="480"></canvas>
+	</div>
+
+	<div class="result">
+		<p id="resultInfo"> </p>
+	</div>
+
+	<!-- Itit -->
+	<script language="JavaScript">
+		// Configure a few setting & Attach camera
+		Webcam.set({
+			width: 640,
+			height: 480,
+			image_format: 'jpeg',
+			jpeg_quality: 90,
+		});
+		Webcam.attach( '#video' );
+	</script>
+
+</body>
+</html>
